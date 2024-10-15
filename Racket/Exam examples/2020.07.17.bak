@@ -1,0 +1,9 @@
+#lang racket
+
+(define-syntax cobol-fold
+  (syntax-rules (direction -> <- from data exec using)
+    ((_ direction -> from i data elem ... (exec body ...) using acc lst)
+     (foldr (lambda (acc lst) body ...) i (list elem ...)))
+    ((_ direction <- from i data elem ... (exec body ...) using acc lst)
+     (foldl (lambda (acc lst) body ...) i (list elem ...)))))
+  

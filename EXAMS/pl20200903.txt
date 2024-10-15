@@ -1,0 +1,111 @@
+PPL 2020.09.03
+
+Scheme, Ex 1 (4 points)
+
+Define a construct variant of call/cc, called call/cc-store, with syntax:
+
+(call/cc-store (k in v) e1 ...)
+
+where k is the current continuation, v is a visible variable in the current
+scope, and e1 ... is the body of the construct. The semantics is the same of the
+usual call/cc (with a simplified syntax, not requiring a lambda), but the
+current continuation must also be stored in v, before executing the body.
+
+Solution:
+(define-syntax call/cc-store
+  (syntax-rules (in)
+    ((_ (k in v) e ... )
+     (call/cc (lambda (k)
+               (set! v k) 
+                e ...)))))
+
+
+Scheme, Ex 2 (5 points)
+
+Define a pure, tail-recursive function, with O(n) complexity, that, given a list
+(e1 e2 ... en), n > 0, returns (en ... e2 e1 e1 e2 ... en). You cannot use
+folds, named lets, and reverse.
+
+Solution:
+(define (hh-tr L)
+  (define (help L out)
+    (if (null? L)
+        out
+        (help (cdr L) (cons (car L) out))))
+  (help L L))
+
+
+Haskell, Ex 3 (7 points)
+
+Define a data structure for Binary Search Trees (BST), i.e. ordered trees where
+elements less than the value stored in the current node are in the left subtree,
+while elements greater than or equal to it are in the right subtree. Define a
+put operation to put a value in a BST, and a member operation to check if a
+value is present or not. Provide all the types of the defined operations.
+
+Solution:
+data Bst a = Nil | Node a (Bst a) (Bst a) deriving (Show, Eq)
+
+put :: Ord a => a -> Bst a -> Bst a
+put v Nil = Node v Nil Nil
+put v (Node x l r) | v < x = Node x (put v l) r 
+put v (Node x l r) = Node x l (put v r) 
+
+member :: Ord t => t -> Bst t -> Bool
+member v Nil = False
+member v (Node x l r) | v == x = True
+member v (Node x l r) | v < x = member v l
+member v (Node x l r) = member v r
+
+
+Haskell, Ex 4 (5 points)
+
+Make BST an instance of Functor and Foldable.
+
+Solution:
+instance Functor Bst where
+  fmap f Nil = Nil
+  fmap f (Node x l r) = Node (f x) (fmap f l) (fmap f r)
+
+instance Foldable Bst where
+  foldr f z Nil = z
+  foldr f z (Node x l r) = foldr f (f x (foldr f z r)) l
+
+
+Haskell, Ex 5 (6 points)
+
+Define a function to merge two BSTs.
+
+Solution:
+merge x y = foldr put x y
+
+
+Erlang, Ex 6 (6 points)
+
+Define a function to merge two BSTs.
+
+Solution:
+merge Nil t = t
+
+Consider a binary tree encoded e.g. in this way
+
+{node 1 {node 2 nil nil} {node 3 nil nil}}.
+
+Write a procedure which takes a binary tree containing function objects, then
+launches a process executing each function, and returns a list of their PIDs.
+Write a procedure which takes a list of PIDs and send a 'stop' signal to each of
+them, waiting for an acknowledgment from them.
+
+Solution:
+btree2proc(nil) ->
+    [];
+btree2proc({node, F, L, R}) ->
+    P = spawn(?MODULE, F, [[]]),
+    btree2proc(L) ++ [P] ++ btree2proc(R).
+
+stopList([]) -> ok;
+stopList([P|Ps]) -> P!stop,
+                    receive
+                        {ack, P} -> ok
+                    end,
+                    stopList(Ps).

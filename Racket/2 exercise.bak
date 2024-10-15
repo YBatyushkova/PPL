@@ -1,0 +1,7 @@
+#lang racket
+
+(define a 'apple)
+
+(set! a 'banana) ; To change the variable value!
+
+a

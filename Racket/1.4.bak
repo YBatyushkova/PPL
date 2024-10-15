@@ -1,0 +1,25 @@
+#lang racket
+
+(displayln "Hello world!")
+
+(define x 5)
+
+;function
+(define (say-hello)
+  (displayln "Hello world!"))
+
+(say-hello)
+
+(define (greet name)
+  (displayln(string-append "Hello " name "!")))
+
+(greet "Yuliya")
+
+;control flow
+(define (greet-only-me name)
+  (if (equal? name "Yuliya")
+   (displayln(string-append "Hello " name "!")) ;then branch
+   (displayln(string-append "You are not welcome!!!")))) ;else branch
+
+(greet-only-me "Yuliya")
+(greet-only-me "qqq")

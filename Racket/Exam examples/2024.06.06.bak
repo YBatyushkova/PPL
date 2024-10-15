@@ -1,0 +1,10 @@
+#lang racket
+
+(define-syntax let-cond
+  (syntax-rules ()
+    ((_ ((condition ((var val) ...) then-body)...) else-body)
+     (cond
+       (condition
+        (let ((var val) ...)
+          then-body))
+       (else else-body)))))

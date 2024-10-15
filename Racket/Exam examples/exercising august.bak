@@ -1,0 +1,82 @@
+#lang racket
+
+(define (iter-vector vec)
+  (let ((cur 0) (top (vector-length vec)))
+    (lambda ()
+      (if (= cur top)
+          '<end>
+          (let ((v (vector-ref vec cur)))
+            (set! cur (+ 1 cur))
+            v)))))
+          
+(define i (iter-vector #(1 2 3)))
+
+(filter (lambda (x) (> x 0)) '(0 10 -11))
+
+(map (lambda (x) (+ 1 x)) '(0 10 -11))
+
+(foldl string-append "+" '("one" " " "two" " " "three"))
+(foldr string-append "+" '("one" " " "two" " " "three"))
+
+(foldl * 1 '(1 2 3 4 5 6))
+
+
+(define-syntax while
+  (syntax-rules ()
+    ((_ condition body ...)
+     (let loop ()
+       (when condition
+         (begin
+           body ...
+           (loop)))))))
+
+(define (fact-while x)
+  (let ((acc 1) (n x))
+    (while (> n 0)
+           (set! acc (* acc n))
+           (set! n (- n 1)))
+    acc))
+
+(define-syntax my-let
+  (syntax-rules ()
+    ((_ ((var expr) ...) body ...)
+     ((lambda(var ...) body ...) expr ...))))
+
+(member 3 '(1 1 2 2 3 4 5))
+
+;;2022.01
+(define-syntax block
+  (syntax-rules (then where <-)
+    ((_ (body-1 ...) then (body-2 ...) where (var <- val-1 val-2) ...)
+     (begin
+       (let ((var val-1) ...)
+         body-1 ...)
+       (let ((var val-2) ...)
+         body-2 ...)))))
+
+(block
+ ((displayln (+ x y))
+ (displayln (* x y))
+ (displayln (* z z)))
+ then
+ ((displayln (+ x y))
+ (displayln (* z x)))
+ where (x <- 12 3)(y <- 8 7)(z <- 3 2))
+
+
+;;2023.09
+(define-syntax multifun
+  (syntax-rules ()
+    ((_ (func ...) (param ...) ((body ...) ...))
+     (begin
+       (define (func param ...)
+         (body ...))
+       ...))))
+
+(multifun (f g) (x y)
+ ((+ x x x y)
+ (* x x y)))
+
+(f 2 5)
+(g 2 5)
+         

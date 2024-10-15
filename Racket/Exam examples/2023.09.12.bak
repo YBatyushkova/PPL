@@ -1,0 +1,23 @@
+#lang racket
+
+; Exam 2023.09.12
+
+; (multifun <list of functions><list of parameters><list of bodies>)
+; (multifun (f g) (x) ((+ x x x)(* x x))
+
+(define-syntax multifun
+  (syntax-rules ()
+    ((_ functions parameters bodies ...)
+     (unless (and (list? functions)(list? parameters)(list? bodies))
+       (error "Not a list"))
+     (begin
+       (let loop ((f-current (car functions))
+                  (f-rest (cdr functions))
+                  (b-current (car bodies))
+                  (b-rest (car bodies)))
+         (define f-current (parameters) (b-current))
+         (unless (or (null? f-rest)(null? b-rest))
+           (loop ((car f-rest)
+                  (cdr f-rest)
+                  (car b-current)
+                  (cdr b-current)))))))))

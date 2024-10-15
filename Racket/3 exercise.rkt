@@ -1,0 +1,321 @@
+#lang racket
+
+(define (list-fruits)
+  (call/cc
+   (lambda (k)
+     (displayln "apple")
+     (k (displayln "banana"))
+     (displayln "carrot"))))
+
+(list-fruits)
+
+(define (lst) "item")
+(lst)
+
+
+; WHILE WITH A BREAK
+(define-syntax while-break
+  (syntax-rules (break-id:); We need 'break-id' because of hygienic macros
+                           ; we can't call 'break' from outside the syntax-rule
+    ((_ cond break-id: break body ...)
+     (call/cc (lambda (break)
+                (let loop ()
+                  (when cond
+                    (begin body ...)
+                    (loop))))))))
+
+(define y 5)
+(while-break (> y 0) break-id: stop ; Any custom name here
+             (when (= y 2) (stop))
+             (set! y (- y 1))
+             (displayln y))
+
+
+
+
+(define *exit-store* '()) ; Global variable
+
+(define (break v)
+  ((car *exit-store*) v))
+
+; FOR WITH A BREAK
+(define-syntax for
+  (syntax-rules (from to do)
+    ((_ var from min to max do body ...)
+     (let* ((min1 min)
+            (max1 max)
+            (inc (if (< min1 max1) + -)))
+       (let ((v (call/cc (lambda (k)
+                           (set! *exit-store* (cons k *exit-store*))
+                           (let loop ((var min1))
+                             body ...
+                             (unless (= var max1)
+                               (loop (inc var 1))))))))
+         (set! *exit-store* (cdr *exit-store*))
+         v)))))
+
+(displayln "FOR")
+(for i from 1 to 10 do
+  (displayln i)
+  (when (= i 5) ( break #t)))
+
+
+; WHILE WITH A BREAK
+(define-syntax while-2
+  (syntax-rules (do)
+    ((_ cond do body ...)
+     (begin
+       (call/cc (lambda (k)
+                  (set! *exit-store* (cons k *exit-store*))
+                  (let loop ()
+                    (when cond
+                      body ...
+                      (loop)))))
+       (set! *exit-store* (cdr *exit-store*))))))
+
+(define a 5)
+(displayln "WHILE")
+(while-2 (> a 0) do
+         (displayln a)
+         (set! a (- a 1))
+         (when (= a 2) (break #t)))
+
+*exit-store*
+
+; EXCEPTIONS
+
+(define *handlers* '())
+
+; Utility functions
+(define (push-handler proc)
+  (set! *handlers* (cons proc *handlers*)))
+
+(define (pop-handler)
+  (let ((head (car *handlers*)))
+    (set! *handlers* (cdr *handlers*))
+    head))
+
+(define (throw x) ; error simulator!
+  (if (pair? *handlers*)
+      ((pop-handler) x)
+      (apply error x))) ; if list of processes is empty
+
+(push-handler displayln)
+(throw 5)
+;(throw 5)
+
+
+
+(define-syntax try
+  (syntax-rules (catch)
+    ((_ expr ... (catch exception-id exception-body ...))
+     (call/cc (lambda(exit)
+                (push-handler (lambda (x)
+                                (if (equal? x exception-id)
+                                    (exit (begin exception-body ...))
+                                    (throw x)))) ; else
+                (let ((res (begin expr ...)))
+                  (pop-handler)
+                  res))))))
+
+(define (foo)
+  (displayln "Foo")
+  (throw "bad-foo"))
+
+(try
+ (displayln "Before foo")
+ (foo)
+ (displayln "After foo")
+ (catch "bad-foo"
+        (displayln "I caught a throw")
+        #f))
+; if we try to catch an unregistered exception,
+; we'll have an error: contract violation
+
+
+; NON-DETERMINISM
+
+(define (is-sum-of sum)
+  (unless (and (>= sum 0) (<= sum 10))
+    (error "out of range" sum))
+  (let ((x (choose '(0 1 2 3 4 5)))
+        (y (choose '(0 1 2 3 4 5))))
+    (displayln (string-append (~a x) "+" (~a y) "=" (~a sum) "?"))
+    (if (= (+ x y) sum)
+        (list x y)
+        (begin
+          (displayln "is-sum-of fail")
+          (fail)))))
+
+(define *paths* '())
+
+(define (push-path x)
+  (set! *paths* (cons x *paths*)))
+
+(define (pop-paths)
+  (let ((p1 (car *paths*)))
+    (set! *paths* (cdr *paths*))
+    p1))
+
+(define (choose choices)
+  (if (null? choices)
+      (begin
+        (displayln "choice fail")
+        (fail))
+      (call/cc (lambda (k)
+                 ; save checkpoint
+                 ; backtrack to k, and choose again from the rest
+                 (push-path (lambda ()
+                              (k (choose (cdr choices)))))
+                 (car choices))))) ; return the current choice
+
+(define fail (lambda ()
+               (if (null? *paths*)
+                   (error "no paths")
+                   ((pop-paths)))))
+
+; double (()) because we're calling the returned continuation
+
+(is-sum-of 6)
+
+; Object-Oriented Programming
+
+; With CLOSURES
+
+#|
+class Person {
+    public name: string
+    private age:  int
+
+    // constructor
+    Person(name, age) {
+        this.name = name
+        this.age = age
+    }
+
+    int growOlder(years: int) {
+        this.age += int
+    }
+}
+
+Person bob = Person(Bob, 25)
+bob.getName()
+|#
+
+(define (new-person ; constructor
+         initial-name
+         initial-age)
+  
+  ; attributes
+  (let ((name initial-name)
+        (age initial-age))
+    
+    ; methods
+    (define (get-name)
+      name)
+
+    (define (grow-older years)
+      (set! age (+ age years))
+      age)
+
+    (define (show)
+      (display "Name: ")
+      (displayln name)
+      (display "Age: ")
+      (displayln age))
+
+    ; dispatcher - to handle calls to methods
+    (lambda (message . args)
+      (apply (case message
+               ((get-name) get-name)
+               ((grow-older) grow-older)
+               ((show) show)
+               (else (error "unknown method")))
+             args))))
+
+(define ada (new-person "Ada" 25))
+(ada 'show)
+
+(define bob (new-person "Bob" 27))
+(bob 'get-name)
+(bob 'grow-older 3)
+(bob 'show)
+
+; Inheritance
+(define (new-superhero name age init-power)
+  (let ((parent (new-person name age)) ; inherits attrs/methods
+        (power init-power))
+
+    (define (use-power)
+      (display name)(display " uses ")(display power)(displayln "!"))
+
+    (define (show)
+      (parent 'show)
+      (display "Power: ")(displayln power))
+
+    (lambda (message . args)
+      (case message
+        ((use-power) (apply use-power args))
+        ((show) (apply show args))
+        (else (apply parent (cons message args)))))))
+
+(define superman (new-superhero "Clark Kent" 32 "Flight"))
+(superman 'show)
+(superman 'grow-older 10)
+(superman 'use-power)
+
+
+; PROTOTYPE-BASED OBJECTS
+
+; HASHMAP with attrs/method names as KEY and
+; their value/implementation as VALUE
+
+; We need to use MACROS because otherwise we cannot
+; quote 'msg' correctly: if we quote 'msg' at runtime
+; we are quoting 'msg' itself: 'msg
+
+(define new-obj make-hash)
+(define clone hash-copy)
+
+; define-syntax-rule defines a mcro that binds single pattern
+
+; SETTER
+(define-syntax-rule (obj-set object msg new-val)
+  (hash-set! object 'msg new-val))
+
+; GETTER
+(define-syntax-rule (obj-get object msg)
+  (hash-ref object 'msg))
+
+; SEND MESSAGE / USE METHOD
+(define-syntax-rule (obj-send object msg arg ...)
+  ((hash-ref object 'msg) ; retrieve method
+   object arg ...)) ; call method with the object itself as first argument, and any arg
+
+(define carl (new-obj))
+
+(obj-set carl name "Carl")
+(obj-set carl show
+         (lambda (self)
+           (display "Name: ")(displayln (obj-get self name))))
+(obj-set carl say-hi
+         (lambda (self to)
+           (display (obj-get self name))
+           (display " says hi to ")
+           (displayln to)))
+
+(obj-send carl show)
+(obj-send carl say-hi "Dan")
+
+; New object that copies properties of carl
+
+(define dan (clone carl))
+
+(obj-set dan name "Dan")
+(obj-send dan show)
+
+(obj-set dan dance
+         (lambda (self)
+           (displayln "I'm Dan, I can dance")))
+(obj-send dan dance)
+(obj-send dan say-hi "Carl")

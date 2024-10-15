@@ -1,0 +1,130 @@
+PPL 2020.07.17
+
+Ex 1 - Scheme
+
+Define the verbose construct for folding illustrated by the following
+example:
+
+(cobol-fold direction -> from 1 data 1 2 3 4 5 6
+            (exec
+             (displayln y)
+             (+ x y))
+             using x y)        
+                               
+This is a fold-right (->) with initial value 1 on the list (1 2 3 4 5
+6), and the fold function is given in the "exec" part.  Of course, <-
+is used to select fold-left instead of right.
+
+
+
+Ex 2 - Haskell
+
+Define a data type that stores an m by n matrix as a list of lists by row.
+After defining an appropriate data constructor, do the following:
+1. Define a function `new' that takes as input two integers m and n
+   and a value `fill', and returns an m by n matrix whose elements are all equal to `fill'.
+2. Define function `replace' such that, given a matrix m, the indices i, j of one of its elements,
+   and a new element, it returns a new matrix equal to m except for the element
+   in position i, j, which is replaced with the new one.
+3. Define function `lookup', which returns the element in a given position
+   of a matrix.
+4. Make the data type an instance of Functor and Foldable.
+5. Make the data type an instance of Applicative.
+
+In your implementation you can use the following functions:
+splitAt :: Int -> [a] -> ([a], [a])
+unzip :: [(a, b)] -> ([a], [b])
+(!!) :: [a] -> Int -> a
+
+
+Ex 3 - Erlang
+
+Define a "broadcaster" process which answers to the following
+commands:
+
+- {spawn, L, V} creates a process for each element of L, passing its
+initial parameter in V, where L is a list of names of functions
+defined in the current module and V is their respective parameters (of
+course it must be |L| = |V|);
+
+- {send, V}, with V a list of values, sends to each respective process
+created with the previous spawn command a message in V; e.g. {spawn,
+[1,2,3]} will send 1 to the first process, 2 to the second, and 3 to
+the third;
+
+- stop is used to end the broadcaster, and to also stop every process
+spawned by it.
+
+
+
+SOLUTIONS
+
+Ex 1
+
+(define-syntax cobol-fold
+  (syntax-rules (direction -> <- data using from exec)
+    ((_ direction -> from i data d ... (exec e ... ) using x y)
+     (foldr (lambda (x y) e ...) i '(d ...)))
+    ((_ direction <- from i data d ... (exec e ... ) using x y)
+     (foldl (lambda (x y) e ...) i '(d ...)))))
+
+Ex 2
+
+newtype Matrix a = Matrix [[a]] deriving (Eq, Show)
+
+new :: Int -> Int -> a -> Matrix a
+new m n fill = Matrix [[fill | _ <- [1..n]] | _ <- [1..m]]
+
+replace :: Int -> Int -> a -> Matrix a -> Matrix a
+replace i j x (Matrix rows) = let (rowsHead, r:rowsTail) = splitAt i rows
+                                  (rHead, x':rTail) = splitAt j r
+                              in Matrix $ rowsHead ++ ((rHead ++ (x:rTail)):rowsTail)
+
+lookup :: Int -> Int -> Matrix a -> a
+lookup i j (Matrix rows) = (rows !! i) !! j
+
+
+instance Functor Matrix where
+  fmap f (Matrix rows) = Matrix $ map (\r -> map f r) rows
+
+instance Foldable Matrix where
+  foldr f e (Matrix rows) = foldr (\r acc -> foldr f acc r) e rows
+
+hConcat :: Matrix a -> Matrix a -> Matrix a
+hConcat (Matrix []) m2 = m2
+hConcat m1 (Matrix []) = m1
+hConcat (Matrix (r1:r1s)) (Matrix (r2:r2s)) =
+  let (Matrix tail) = hConcat (Matrix r1s) (Matrix r2s)
+  in Matrix $ (r1 ++ r2) : tail
+
+vConcat :: Matrix a -> Matrix a -> Matrix a
+vConcat (Matrix rows1) (Matrix rows2) = Matrix $ rows1 ++ rows2
+
+concatMapM :: (a -> Matrix b) -> Matrix a -> Matrix b
+concatMapM f (Matrix rows) =
+  let empty = Matrix []
+  in foldl
+     (\acc r -> vConcat acc $ foldl (\acc x -> hConcat acc (f x)) empty r)
+     empty
+     rows
+
+instance Applicative Matrix where
+  pure x = Matrix [[x]]
+  fs <*> xs = concatMapM (\f -> fmap f xs) fs
+
+Ex 3
+
+broadcaster(Pids) ->
+    receive
+        {spawn, Fs, Vs} ->
+            FDs = lists:zip(Fs, Vs),
+            io:format("~p~n", [FDs]),
+            broadcaster([spawn_link(?MODULE, F, V) || {F,V} <- FDs]);
+        {send, Vs} ->
+            FDs = lists:zip(Pids, Vs),
+            io:format("~p~n", [FDs]),
+            [ Pid ! V || {Pid, V} <- FDs];
+        stop ->
+            ok
+    end.
+
